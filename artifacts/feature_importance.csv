@@ -1,0 +1,11 @@
+Feature,Importance
+num__Power Proxy,0.2734079464751833
+num__Rotational speed [rpm],0.18260039407646853
+num__Torque [Nm],0.17582108832297377
+num__Temperature Difference [K],0.13878875652456404
+num__Tool wear [min],0.129123562314591
+num__Air temperature [K],0.04486858537814551
+num__Process temperature [K],0.03681643756296989
+cat__Type_L,0.009386547074706843
+cat__Type_M,0.006012075743492947
+cat__Type_H,0.0031746065269042056

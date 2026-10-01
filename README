@@ -1,0 +1,600 @@
+# ⚙️ Predictive Maintenance AI
+
+An end-to-end Machine Learning project that predicts potential machine failures using machine operating conditions and provides failure-risk predictions through an interactive Streamlit application.
+
+---
+
+## 📌 Project Overview
+
+Unexpected machine failures can cause production downtime, maintenance costs, and operational disruptions.
+
+**Predictive Maintenance AI** uses machine sensor and operating data to identify patterns associated with machine failures and estimate the probability of failure before it occurs.
+
+The project covers the complete Machine Learning workflow:
+
+**Data Validation → EDA → Feature Engineering → Model Development → Model Comparison → Hyperparameter Tuning → Threshold Optimization → Explainability → Streamlit Deployment**
+
+---
+
+## 🎯 Business Problem
+
+Traditional maintenance approaches often rely on:
+
+- Fixed maintenance schedules
+- Manual inspection
+- Reactive maintenance after equipment failure
+
+A predictive approach can help identify machines with higher failure risk and support earlier maintenance decisions.
+
+### Objective
+
+Build a binary classification model that predicts whether a machine is likely to experience a failure based on its operating conditions.
+
+---
+
+## 📊 Dataset
+
+The project uses the **AI4I 2020 Predictive Maintenance Dataset**.
+
+### Dataset Summary
+
+| Property | Value |
+|---|---:|
+| Records | 10,000 |
+| Features | 14 |
+| Missing Values | 0 |
+| Duplicate Rows | 0 |
+| Failure Cases | 339 |
+| Non-Failure Cases | 9,661 |
+| Failure Rate | 3.39% |
+
+### Target Variable
+
+**Machine failure**
+
+- `0` → No machine failure
+- `1` → Machine failure
+
+The target is highly imbalanced, with only **3.39%** of records representing failures. Therefore, accuracy alone is not sufficient for evaluating the model.
+
+---
+
+## 🧩 Features
+
+The dataset contains machine operating and product information.
+
+### Original Features
+
+- Product Type
+- Air Temperature
+- Process Temperature
+- Rotational Speed
+- Torque
+- Tool Wear
+
+### Identifier Columns
+
+The following columns were not used as predictive features:
+
+- UDI
+- Product ID
+
+### Failure Mode Columns
+
+The following columns were excluded from the primary model because they directly represent specific failure modes:
+
+- TWF
+- HDF
+- PWF
+- OSF
+- RNF
+
+This helps keep the prediction focused on machine operating conditions rather than directly using failure-mode indicators.
+
+---
+
+## 🔧 Feature Engineering
+
+Two additional features were created.
+
+### 1. Temperature Difference
+
+```python
+df["Temperature Difference [K]"] = (
+    df["Process temperature [K]"] -
+    df["Air temperature [K]"]
+)
+```
+
+This represents the difference between process and air temperature.
+
+### 2. Power Proxy
+
+```python
+df["Power Proxy"] = (
+    df["Torque [Nm]"] *
+    df["Rotational speed [rpm]"]
+)
+```
+
+This provides a proxy for the relationship between torque and rotational speed.
+
+> Note: Power Proxy is an engineered proxy and not a direct measurement of physical power.
+
+---
+
+## 🔍 Data Preprocessing
+
+The following preprocessing steps were implemented:
+
+- Data validation
+- Missing-value checking
+- Duplicate checking
+- Feature selection
+- Feature engineering
+- Numerical feature scaling
+- Categorical feature encoding
+- Stratified train-test split
+
+### Train-Test Split
+
+```text
+Training Data: 80%
+Testing Data: 20%
+Random State: 42
+Stratification: Yes
+```
+
+### Preprocessing Pipeline
+
+Numerical features were processed using:
+
+```text
+StandardScaler
+```
+
+Categorical features were processed using:
+
+```text
+OneHotEncoder(handle_unknown="ignore")
+```
+
+These transformations were implemented using a Scikit-learn `Pipeline` and `ColumnTransformer`.
+
+---
+
+## 🤖 Machine Learning Models
+
+Three classification algorithms were compared:
+
+1. Logistic Regression
+2. Decision Tree
+3. Random Forest
+
+The models were evaluated using:
+
+- Accuracy
+- Precision
+- Recall
+- F1 Score
+- ROC-AUC
+- Confusion Matrix
+
+---
+
+## 📈 Model Comparison
+
+### Test Set Results — Default Threshold 0.50
+
+| Model | Accuracy | Precision | Recall | F1 Score | ROC-AUC |
+|---|---:|---:|---:|---:|---:|
+| Logistic Regression | 96.75% | 57.14% | 17.65% | 26.97% | 92.57% |
+| Decision Tree | 98.50% | 97.50% | 57.35% | 72.22% | 94.37% |
+| **Random Forest** | **99.10%** | **94.64%** | **77.94%** | **85.48%** | **97.99%** |
+
+The Random Forest model provided the strongest held-out test performance among the compared models and was selected for the final application.
+
+---
+
+## ⚖️ Handling Class Imbalance
+
+Because machine failures represent only **3.39%** of the dataset, class imbalance was evaluated using `class_weight="balanced"`.
+
+For Random Forest:
+
+| Metric | Standard | Balanced |
+|---|---:|---:|
+| Precision | 94.64% | 63.22% |
+| Recall | 77.94% | 80.88% |
+| F1 Score | 85.48% | 70.97% |
+| ROC-AUC | 97.99% | 97.69% |
+
+The balanced version increased recall slightly but substantially reduced precision and F1 score.
+
+Therefore, the standard Random Forest configuration was retained for the final model.
+
+---
+
+## 🎛️ Hyperparameter Tuning
+
+Random Forest hyperparameters were explored using:
+
+```text
+RandomizedSearchCV
+```
+
+with:
+
+```text
+5-fold Stratified Cross-Validation
+30 Randomized Iterations
+Scoring: F1
+```
+
+### Best Parameters Found
+
+```text
+n_estimators      = 500
+max_depth         = 15
+min_samples_split = 2
+min_samples_leaf  = 4
+max_features      = None
+class_weight      = None
+```
+
+Although the tuned model achieved a strong cross-validation F1 score, its held-out test performance was lower than the original Random Forest configuration.
+
+Therefore, the original Random Forest was retained for the final application.
+
+---
+
+## 🎚️ Threshold Optimization
+
+The default classification threshold of `0.50` was evaluated against several alternative thresholds.
+
+During threshold analysis on the current held-out evaluation split, a threshold of **0.40** produced the highest F1 score among the tested thresholds.
+
+### Threshold 0.40 Results
+
+| Metric | Result |
+|---|---:|
+| Precision | 93.33% |
+| Recall | 82.35% |
+| F1 Score | 87.50% |
+| False Positives | 4 |
+| False Negatives | 12 |
+| True Positives | 56 |
+
+This threshold was selected for the Streamlit application's failure-risk classification.
+
+> Note: The threshold was selected during analysis of the current held-out evaluation split. A separate validation set or cross-validation-based threshold selection could provide a more rigorous final threshold-selection procedure.
+
+---
+
+## 🏆 Final Model
+
+The final application uses:
+
+```text
+Random Forest Classifier
+```
+
+Configuration:
+
+```python
+RandomForestClassifier(
+    n_estimators=200,
+    max_depth=10,
+    random_state=42,
+    n_jobs=-1
+)
+```
+
+### Final Model Performance at Default Threshold 0.50
+
+```text
+Accuracy  : 99.10%
+Precision : 94.64%
+Recall    : 77.94%
+F1 Score  : 85.48%
+ROC-AUC   : 97.99%
+```
+
+The Streamlit application uses the optimized classification threshold:
+
+```text
+0.40
+```
+
+---
+
+## 🧠 Model Explainability
+
+Feature importance was extracted from the final Random Forest model to understand which features the model relied on most.
+
+### Feature Importance
+
+| Feature | Importance |
+|---|---:|
+| Power Proxy | 27.34% |
+| Rotational Speed | 18.26% |
+| Torque | 17.58% |
+| Temperature Difference | 13.88% |
+| Tool Wear | 12.91% |
+| Air Temperature | 4.49% |
+| Process Temperature | 3.68% |
+| Type | ~1.86% |
+
+The feature importance values represent the model's relative reliance on features within this trained model.
+
+> Feature importance should not be interpreted as proof that a feature directly causes machine failure.
+
+The generated explainability artifacts are available in:
+
+```text
+artifacts/
+├── feature_importance.csv
+└── feature_importance.png
+```
+
+---
+
+## 🖥️ Streamlit Application
+
+The project includes an interactive Streamlit application with three main sections.
+
+### 1. Dashboard
+
+Displays:
+
+- Dataset size
+- Machine failure rate
+- Selected ML model
+- ROC-AUC score
+- Project overview
+
+### 2. Failure Prediction
+
+Users can enter machine operating conditions such as:
+
+- Machine Type
+- Air Temperature
+- Process Temperature
+- Rotational Speed
+- Torque
+- Tool Wear
+
+The application calculates:
+
+```text
+Temperature Difference
+Power Proxy
+Failure Probability
+```
+
+and provides a machine failure-risk prediction.
+
+### 3. Model Insights
+
+Displays:
+
+- Model performance
+- Threshold optimization results
+- Feature importance
+- Model interpretation notes
+
+---
+
+## 📂 Project Structure
+
+```text
+Predictive-Maintenance-AI/
+│
+├── artifacts/
+│   ├── feature_importance.csv
+│   └── feature_importance.png
+│
+├── data/
+│   └── raw/
+│       └── ai4i2020.csv
+│
+├── docs/
+│   ├── 01_problem_statement.md
+│   ├── 02_dataset.md
+│   ├── 03_data_dictionary.md
+│   ├── 04_initial_data_check.md
+│   ├── 05_eda_notes.md
+│   └── 06_feature_engineering.md
+│
+├── models/
+│   └── predictive_maintenance_model.pkl
+│
+├── src/
+│   ├── data_check.py
+│   ├── train_baseline.py
+│   ├── train_models.py
+│   ├── tune_random_forest.py
+│   ├── threshold_optimization.py
+│   ├── train_final_model.py
+│   └── model_explainability.py
+│
+├── app.py
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
+
+---
+
+## ⚙️ Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone <your-github-repository-url>
+```
+
+### 2. Navigate to the Project
+
+```bash
+cd Predictive-Maintenance-AI
+```
+
+### 3. Create a Virtual Environment
+
+```bash
+python -m venv .venv
+```
+
+### 4. Activate the Virtual Environment
+
+### Windows
+
+```powershell
+.venv\Scripts\activate
+```
+
+### 5. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## ▶️ Run the Streamlit Application
+
+Run:
+
+```bash
+streamlit run app.py
+```
+
+The application will open in your browser.
+
+---
+
+## 🧪 Run the ML Scripts
+
+### Data Validation
+
+```bash
+python src/data_check.py
+```
+
+### Baseline Model
+
+```bash
+python src/train_baseline.py
+```
+
+### Model Comparison
+
+```bash
+python src/train_models.py
+```
+
+### Hyperparameter Tuning
+
+```bash
+python src/tune_random_forest.py
+```
+
+### Threshold Optimization
+
+```bash
+python src/threshold_optimization.py
+```
+
+### Train Final Model
+
+```bash
+python src/train_final_model.py
+```
+
+### Model Explainability
+
+```bash
+python src/model_explainability.py
+```
+
+---
+
+## 🛠️ Tech Stack
+
+### Programming
+
+- Python
+
+### Data Analysis
+
+- Pandas
+- NumPy
+
+### Data Visualization
+
+- Matplotlib
+- Seaborn
+
+### Machine Learning
+
+- Scikit-learn
+
+### Application
+
+- Streamlit
+
+### Development
+
+- VS Code
+- Git
+- GitHub
+
+---
+
+## 🚀 Future Improvements
+
+Potential improvements for future versions include:
+
+- Cross-validation-based threshold optimization
+- SHAP-based model explainability
+- Real-time sensor data integration
+- Time-series based failure prediction
+- Model monitoring
+- Automated retraining pipeline
+- Cloud deployment
+- Maintenance recommendation system
+- Integration with industrial IoT data
+
+---
+
+## 📌 Key Learning Outcomes
+
+This project helped implement an end-to-end Machine Learning workflow involving:
+
+- Data validation
+- Exploratory Data Analysis
+- Feature engineering
+- Data preprocessing
+- Binary classification
+- Imbalanced classification
+- Model comparison
+- Hyperparameter tuning
+- Threshold optimization
+- Model explainability
+- Streamlit deployment
+- Project documentation
+
+---
+
+## 👨‍💻 Author
+
+**Tejas Sonawane**
+
+Data Science & Analytics | Machine Learning | Python | SQL | Power BI
+
+---
+
+## ⭐ Project
+
+If you find this project useful or interesting, feel free to explore the repository and share your feedback.
